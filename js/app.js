@@ -21,6 +21,7 @@
   map.createPane("selLine").style.zIndex = 455;   // 선택한 행정동 테두리
   map.createPane("hoverLine").style.zIndex = 460; // 마우스를 올린 지역 테두리 (가장 위)
   ["guLines", "selLine", "hoverLine"].forEach(function (p) { map.getPane(p).style.pointerEvents = "none"; });
+  map.createPane("stations").style.zIndex = 470; // 미세먼지 측정소 점 (마우스를 올리면 정보 표시)
 
   var VWORLD_ATTR = '&copy; <a href="https://www.vworld.kr" target="_blank" rel="noopener">VWorld</a>';
   function vworld(layer, ext) {
@@ -163,7 +164,7 @@
     gus.forEach(function (g) {
       g.rows = data.times.map(function (_, h) {
         var avg = {};
-        ["temp", "feels", "pop", "wind"].forEach(function (k) {
+        ["temp", "feels", "pop", "wind", "uv", "pm10", "pm25"].forEach(function (k) {
           var s = 0, n = 0;
           g.dongs.forEach(function (d) { var v = d.rows[h][k]; if (v != null) { s += v; n++; } });
           avg[k] = n ? s / n : null;
@@ -175,6 +176,11 @@
           if (r.vec != null && r.wind != null) { u += r.wind * Math.sin(r.vec * Math.PI / 180); v += r.wind * Math.cos(r.vec * Math.PI / 180); }
         });
         avg.vec = (Math.atan2(u, v) * 180 / Math.PI + 360) % 360;
+        // 미세먼지: 측정 구간은 평균값으로 등급을 다시 매기고, 예보 구간은 같은 등급을 그대로 쓴다
+        var first = g.dongs[0].rows[h];
+        avg.pmMode = first.pmMode;
+        avg.pm10g = first.pmMode === "측정" ? Weather.gradeOf("pm10", avg.pm10) : first.pm10g;
+        avg.pm25g = first.pmMode === "측정" ? Weather.gradeOf("pm25", avg.pm25) : first.pm25g;
         return avg;
       });
     });
@@ -186,6 +192,8 @@
     timeInput.value = state.hour;
     var src = "예보: " + data.meta.source;
     if (data.meta.base) { var bt = kst(data.meta.base); src += " (" + bt.month + "." + bt.date + " " + bt.hour + "시 발표)"; }
+    if (data.meta.uvIssued) src += " · 자외선: 기상청 생활기상지수";
+    if (data.meta.airTime) { var at = kst(data.meta.airTime); src += " · 미세먼지: 에어코리아 (" + at.hour + "시 측정)"; }
     document.getElementById("source").textContent = src + " · 체감온도는 기상청 산출식으로 계산";
     setupTimebar();
     render();
@@ -211,7 +219,9 @@
       var oldBase = state.data.meta.base ? state.data.meta.base.getTime() : null;
       var newBase = data.meta.base ? data.meta.base.getTime() : null;
       var hourChanged = data.times[0].getTime() !== state.data.times[0].getTime();
-      if (hourChanged || newBase !== oldBase || data.meta.source !== state.data.meta.source) applyData(data);
+      var t = function (d) { return d ? new Date(d).getTime() : null; };
+      var extraChanged = t(data.meta.airTime) !== t(state.data.meta.airTime) || t(data.meta.uvIssued) !== t(state.data.meta.uvIssued);
+      if (hourChanged || extraChanged || newBase !== oldBase || data.meta.source !== state.data.meta.source) applyData(data);
     }).catch(function (err) { console.warn("예보 갱신 실패, 다음 확인 때 다시 시도합니다:", err); })
       .then(function () { checking = false; });
   }
@@ -247,10 +257,11 @@
     if (!state.data) { updateTitle(); return; }
     var L_ = state.layer ? LAYERS[state.layer] : null;
     units().forEach(function (u) {
-      var v = L_ ? L_.get(u.rows[state.hour]) : null;
-      u.layer.setStyle({ fillColor: L_ ? L_.color(v) : "#000", fillOpacity: L_ ? L_.opacity : 0 });
+      var row = u.rows[state.hour], v = L_ ? L_.get(row) : null;
+      u.layer.setStyle({ fillColor: L_ ? L_.color(v, row) : "#000", fillOpacity: L_ ? L_.opacity : 0 });
     });
     placeLabels();
+    renderStations();
     renderLegend();
     renderHourly();
     updateTimeLabel();
@@ -267,7 +278,7 @@
     units().forEach(function (u) {
       var show = false;
       if (state.labels) {
-        var val = L_ ? L_.fmt(L_.get(u.rows[state.hour])) : "";
+        var val = L_ ? valText(L_, u.rows[state.hour]) : "";
         var p = map.latLngToContainerPoint(u.label.getLatLng());
         var arrow = L_ && L_.dir ? windArrow(L_.dir(u.rows[state.hour])) : "";
         var w = (u.name.length + val.length) * 12 + 18 + (arrow ? 14 : 0), h = 22;
@@ -289,8 +300,12 @@
   function renderLegend() {
     var el = document.getElementById("legend");
     var L_ = state.layer ? LAYERS[state.layer] : null;
-    document.getElementById("hourly-layer").textContent = L_ ? L_.name + (L_.short ? " (" + L_.unit + ")" : "") : "날씨";
+    document.getElementById("hourly-layer").textContent = L_ ? L_.name + (L_.short && L_.unit ? " (" + L_.unit + ")" : "") : "날씨";
     if (!L_) { el.innerHTML = ""; return; }
+    if (L_.items) {
+      el.innerHTML = L_.items.map(function (it) { return '<span class="litem"><i style="background:' + it[1] + '"></i>' + it[0] + "</span>"; }).join("");
+      return;
+    }
     var a = L_.legend[0], b = L_.legend[L_.legend.length - 1], html = "<b>" + L_.fmt(a) + "</b>";
     for (var i = 0; i <= 9; i++) html += '<i style="background:' + L_.color(a + (b - a) * i / 9) + '"></i>';
     el.innerHTML = html + "<b>" + L_.fmt(b) + "</b>";
@@ -299,6 +314,7 @@
   function updateTitle() {
     var L_ = state.layer ? LAYERS[state.layer] : null;
     var unit = mode() === "gu" ? "구별 평균" : "행정동별";
+    if (L_ && L_.note && state.data) unit = L_.note(dongs[0].rows[state.hour]);
     var when = state.data ? fmtTime(state.hour) : "";
     document.getElementById("map-title").innerHTML = L_
       ? "<b>" + L_.name + "</b><span>" + unit + " · " + when + "</span>"
@@ -337,7 +353,7 @@
       var cls = "hour" + (newDay ? " newday" : "") + (i === 0 ? " now" : "");
       html += '<button type="button" class="' + cls + '" data-i="' + i + '"' + (i === state.hour ? ' aria-current="true"' : "") + '>' +
         '<span class="day">' + dayText + '</span><span class="t">' + (i === 0 ? "지금" : t.hour + "시") + '</span>' +
-        icon(row.code, row.day) + '<span class="v">' + (L_.dir ? windArrow(L_.dir(row)) : "") + (L_.short || L_.fmt)(L_.get(row)) + '</span><span class="p">' + row.pop + '%</span></button>';
+        icon(row.code, row.day) + '<span class="v">' + (L_.dir ? windArrow(L_.dir(row)) : "") + shortText(L_, row) + '</span><span class="p">' + row.pop + '%</span></button>';
     });
     strip.innerHTML = html;
     var cur = strip.querySelector('[aria-current="true"]');
@@ -367,6 +383,27 @@
     var b = e.target.closest(".hour");
     if (b) setHour(+b.getAttribute("data-i"));
   });
+
+  function valText(L_, row) { return L_.text ? L_.text(row) : L_.fmt(L_.get(row)); }
+  function shortText(L_, row) { return L_.short ? L_.short(L_.get(row), row) : L_.fmt(L_.get(row)); }
+
+  // ---------- 미세먼지 측정소 ----------
+  // 미세먼지 레이어를 보고 있고 '측정' 시각일 때만 측정소 35곳을 점으로 보여준다
+  var stationLayer = L.layerGroup().addTo(map);
+  function renderStations() {
+    stationLayer.clearLayers();
+    var L_ = state.layer ? LAYERS[state.layer] : null;
+    if (!L_ || !L_.kind || !state.data || !state.data.air) return;
+    if (dongs[0].rows[state.hour].pmMode !== "측정") return;
+    var at = kst(state.data.meta.airTime);
+    state.data.air.stations.forEach(function (s) {
+      var v = s[L_.kind], g = Weather.gradeOf(L_.kind, v);
+      L.circleMarker([s.lat, s.lon], {
+        radius: 6, weight: 2, color: "#ffffff", fillColor: g ? Weather.PM_COLORS[g] : "#999999", fillOpacity: 1, pane: "stations"
+      }).bindTooltip(s.name + " 측정소<br>" + L_.name + " " + (v == null ? "점검 중" : Math.round(v) + "㎍/㎥ (" + g + ")") +
+        "<br>" + at.month + "." + at.date + " " + at.hour + "시 측정", { direction: "top", offset: [0, -6] }).addTo(stationLayer);
+    });
+  }
 
   // 풍향 화살표: 기상청 풍향(VEC)은 바람이 '불어오는' 방향이므로, 바람이 '불어가는' 쪽(+180°)을 가리키게 돌린다
   function windArrow(vec) {

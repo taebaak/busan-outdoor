@@ -8,11 +8,91 @@
 
   // 1순위: 기상청 단기예보 파일 (scripts/fetch_kma.py가 만든 data/forecast.json)
   // 2순위: 파일이 없거나 지난 예보면 Open-Meteo
+  // 자외선(uv.json)과 미세먼지(air.json)는 있으면 덧붙이고, 없으면 그 레이어만 비워 둔다
   function load(points) {
-    return fetch("data/forecast.json", { cache: "no-store" })
+    var base = fetch("data/forecast.json", { cache: "no-store" })
       .then(function (r) { if (!r.ok) throw new Error("no file"); return r.json(); })
       .then(function (json) { return fromKma(json, points); })
       .catch(function () { return loadOpenMeteo(points); });
+    return Promise.all([base, optional("data/uv.json"), optional("data/air.json")]).then(function (res) {
+      var data = res[0];
+      addUv(data, res[1]);
+      addAir(data, points, res[2]);
+      return data;
+    });
+  }
+  function optional(url) {
+    return fetch(url, { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
+  }
+
+  // ---------- 자외선: 3시간 간격 예보를 1시간 간격으로 (앞뒤 값 사이를 직선으로 채움) ----------
+  function addUv(data, uv) {
+    var pts = uv ? uv.values.map(function (v) { return [new Date(v.time).getTime(), v.uv]; }) : [];
+    data.meta.uvIssued = uv ? uv.issued : null;
+    var series = data.times.map(function (t) {
+      var x = t.getTime();
+      for (var i = 1; i < pts.length; i++) {
+        if (x >= pts[i - 1][0] && x <= pts[i][0]) {
+          var f = (x - pts[i - 1][0]) / (pts[i][0] - pts[i - 1][0]);
+          return pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * f;
+        }
+      }
+      return null;
+    });
+    data.byIndex.forEach(function (rows) { rows.forEach(function (r, h) { r.uv = series[h]; }); });
+  }
+
+  // ---------- 미세먼지 ----------
+  // 지금 시각: 측정소 값을 거리 가중 보간(IDW)해서 행정동 값을 추정한다.
+  // 앞으로: 공식 시간별 예보가 없으므로 그날의 부산 권역 예보 등급을 쓴다.
+  var PM_LIMITS = { pm10: [30, 80, 150], pm25: [15, 35, 75] };            // 환경부 등급 경계 (좋음/보통/나쁨/매우나쁨)
+  var PM_TYPICAL = { pm10: { "좋음": 15, "보통": 55, "나쁨": 115, "매우나쁨": 180 }, pm25: { "좋음": 8, "보통": 25, "나쁨": 55, "매우나쁨": 90 } };
+  var GRADES = ["좋음", "보통", "나쁨", "매우나쁨"];
+  function gradeOf(kind, v) {
+    if (v == null) return null;
+    var lim = PM_LIMITS[kind];
+    return v <= lim[0] ? "좋음" : v <= lim[1] ? "보통" : v <= lim[2] ? "나쁨" : "매우나쁨";
+  }
+  function km(a, b) {
+    var dx = (a.lon - b.lon) * 111.32 * Math.cos(a.lat * Math.PI / 180), dy = (a.lat - b.lat) * 110.57;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  function idw(p, stations, kind) {
+    var near = stations.filter(function (s) { return s[kind] != null; })
+      .map(function (s) { return { s: s, d: km(p, s) }; })
+      .sort(function (a, b) { return a.d - b.d; }).slice(0, 4)
+      .filter(function (x, i) { return i === 0 || x.d <= 15; });
+    if (!near.length) return null;
+    if (near[0].d < 0.3) return near[0].s[kind];
+    var sw = 0, sv = 0;
+    near.forEach(function (x) { var w = 1 / (x.d * x.d); sw += w; sv += w * x.s[kind]; });
+    return sv / sw;
+  }
+  function kstDate(t) { return new Date(t.getTime() + 9 * 3600e3).toISOString().slice(0, 10); }
+
+  function addAir(data, points, air) {
+    data.air = air;
+    data.meta.airTime = air && air.dataTime ? new Date(air.dataTime) : null;
+    var measured = data.meta.airTime ? data.meta.airTime.getTime() : null;
+    data.byIndex.forEach(function (rows, i) {
+      var p = points[i], est = null;
+      rows.forEach(function (r, h) {
+        var t = data.times[h];
+        // 측정 시각과 같은 시간대(예보 첫 칸 = 지금)는 측정값, 그 뒤는 하루 단위 예보 등급
+        if (measured && Math.abs(t.getTime() - measured) <= 90 * 60e3) {
+          est = est || { pm10: idw(p, air.stations, "pm10"), pm25: idw(p, air.stations, "pm25") };
+          r.pmMode = "측정";
+          r.pm10 = est.pm10; r.pm25 = est.pm25;
+          r.pm10g = gradeOf("pm10", r.pm10); r.pm25g = gradeOf("pm25", r.pm25);
+        } else {
+          var fc = air && air.forecast && air.forecast[kstDate(t)];
+          r.pmMode = fc ? "예보" : null;
+          r.pm10g = fc && fc.pm10 || null; r.pm25g = fc && fc.pm25 || null;
+          r.pm10 = r.pm10g ? PM_TYPICAL.pm10[r.pm10g] : null;
+          r.pm25 = r.pm25g ? PM_TYPICAL.pm25[r.pm25g] : null;
+        }
+      });
+    });
   }
 
   function fromKma(json, points) {
@@ -152,6 +232,9 @@
     };
   }
 
+  // 미세먼지 등급색: 좋음 파랑 · 보통 초록 · 나쁨 주황 · 매우나쁨 빨강 (에어코리아 관례)
+  var PM_COLORS = { "좋음": "#4a90e2", "보통": "#3fbf6f", "나쁨": "#f2a33a", "매우나쁨": "#e0503a" };
+
   var LAYERS = {
     temp: { name: "기온", unit: "°", get: function (r) { return r.temp; }, color: stepped(TEMP_STOPS, 2),
       fmt: function (v) { return Math.round(v) + "°"; }, legend: [0, 10, 20, 30], opacity: 0.55 },
@@ -161,8 +244,40 @@
       fmt: function (v) { return v.toFixed(1) + "m/s"; }, short: function (v) { return v.toFixed(1); }, legend: [0, 4, 9, 14], opacity: 0.6,
       dir: function (r) { return r.vec; } },
     pop: { name: "강수확률", unit: "%", get: function (r) { return r.pop; }, color: stepped(POP_STOPS, 10),
-      fmt: function (v) { return Math.round(v) + "%"; }, legend: [0, 30, 60, 90], opacity: 0.6 }
+      fmt: function (v) { return Math.round(v) + "%"; }, legend: [0, 30, 60, 90], opacity: 0.6 },
+    uv: uvLayer(),
+    pm10: pmLayer("pm10", "미세먼지"),
+    pm25: pmLayer("pm25", "초미세먼지")
   };
 
-  window.Weather = { load: load, LAYERS: LAYERS, HOURS: HOURS };
+  // 자외선지수: 기상청 5단계 (낮음 0~2, 보통 3~5, 높음 6~7, 매우높음 8~10, 위험 11 이상)
+  function uvLayer() {
+    var steps = [[2, "낮음", "#7bc47f"], [5, "보통", "#f2d24b"], [7, "높음", "#f29b3c"], [10, "매우높음", "#e0533a"], [99, "위험", "#8e44ad"]];
+    function stage(v) { var r = Math.round(v); for (var i = 0; i < steps.length; i++) if (r <= steps[i][0]) return steps[i]; }
+    return {
+      name: "자외선", unit: "", opacity: 0.55, get: function (r) { return r.uv; },
+      color: function (v) { return v == null ? "#cccccc" : stage(v)[2]; },
+      fmt: function (v) { return v == null ? "-" : Math.round(v) + " " + stage(v)[1]; },
+      short: function (v) { return v == null ? "-" : String(Math.round(v)); },
+      items: steps.map(function (s) { return [s[1], s[2]]; }),
+      note: function () { return "부산 전체 같은 예보 (기상청 생활기상지수)"; }
+    };
+  }
+
+  function pmLayer(kind, name) {
+    var g = kind + "g";
+    return {
+      name: name, unit: "㎍/㎥", opacity: 0.55, kind: kind,
+      get: function (r) { return r[kind]; },
+      color: function (v, r) { var gr = r ? r[g] : gradeOf(kind, v); return gr ? PM_COLORS[gr] : "#cccccc"; },
+      fmt: function (v) { return v == null ? "-" : Math.round(v) + " " + gradeOf(kind, v); },
+      // 예보 구간은 숫자가 아니라 등급만 의미가 있으므로 등급만 보여준다
+      text: function (r) { return r[kind] == null ? "-" : r.pmMode === "예보" ? r[g] : Math.round(r[kind]) + " " + r[g]; },
+      short: function (v, r) { return r && r.pmMode === "예보" ? r[g] : v == null ? "-" : String(Math.round(v)); },
+      items: GRADES.map(function (gr) { return [gr, PM_COLORS[gr]]; }),
+      note: function (r) { return !r || !r.pmMode ? "자료 없음" : r.pmMode === "측정" ? "측정소 값으로 추정 (에어코리아)" : "하루 단위 예보 등급 (에어코리아)"; }
+    };
+  }
+
+  window.Weather = { load: load, LAYERS: LAYERS, HOURS: HOURS, gradeOf: gradeOf, PM_COLORS: PM_COLORS };
 })();

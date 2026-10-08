@@ -98,3 +98,7 @@ button { font: inherit; color: inherit; }
 .warr { width: 11px; height: 11px; display: inline-block; vertical-align: -1px; margin-right: 2px; }
 .hour .v .warr { width: 12px; height: 12px; color: var(--accent); }
 .hour .v { white-space: nowrap; font-size: 14px; }
+
+/* 단계형 범례 (자외선, 미세먼지) */
+.legend .litem { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; }
+.legend .litem i { width: 12px; height: 12px; border-radius: 2px; }
