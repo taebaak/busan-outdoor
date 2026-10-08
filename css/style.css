@@ -54,7 +54,7 @@ button { font: inherit; color: inherit; }
 .hourly-strip { display: flex; overflow-x: auto; scrollbar-width: thin; padding-bottom: 2px; cursor: grab; user-select: none; }
 .hourly-strip.dragging { cursor: grabbing; }
 .hourly-strip.dragging .hour { pointer-events: none; }
-.hour { flex: 0 0 50px; display: grid; justify-items: center; gap: 2px; padding: 4px 0 6px; border: 0; background: none; border-radius: 0; cursor: pointer; font-variant-numeric: tabular-nums; position: relative; }
+.hour { flex: 0 0 60px; display: grid; justify-items: center; gap: 2px; padding: 4px 0 6px; border: 0; background: none; border-radius: 0; cursor: pointer; font-variant-numeric: tabular-nums; position: relative; }
 .hour:hover { background: #f2f5f6; }
 /* 날짜가 바뀌는 칸: 왼쪽 구분선 + 날짜 */
 .hour.newday { border-left: 1.5px solid #8a979d; margin-left: 6px; }
@@ -93,3 +93,8 @@ button { font: inherit; color: inherit; }
   .map-title { top: auto; bottom: 280px; font-size: 12px; }
   .now { min-width: 0; font-size: 12px; }
 }
+
+/* 풍향 화살표 (바람 레이어) */
+.warr { width: 11px; height: 11px; display: inline-block; vertical-align: -1px; margin-right: 2px; }
+.hour .v .warr { width: 12px; height: 12px; color: var(--accent); }
+.hour .v { white-space: nowrap; font-size: 14px; }

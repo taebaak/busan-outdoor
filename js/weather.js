@@ -4,7 +4,7 @@
 
   var HOURS = 72;
   var VARS = ["temperature_2m", "relative_humidity_2m", "precipitation_probability", "precipitation",
-    "weather_code", "wind_speed_10m", "is_day"];
+    "weather_code", "wind_speed_10m", "wind_direction_10m", "is_day"];
 
   // 1순위: 기상청 단기예보 파일 (scripts/fetch_kma.py가 만든 data/forecast.json)
   // 2순위: 파일이 없거나 지난 예보면 Open-Meteo
@@ -29,7 +29,7 @@
         return cell.slice(start, start + HOURS).map(function (r, k) {
           var t = times[start + k];
           var row = {
-            temp: r.temp, rh: r.rh, pop: r.pop, pcp: r.pcp, wind: r.wind,
+            temp: r.temp, rh: r.rh, pop: r.pop, pcp: r.pcp, wind: r.wind, vec: r.vec,
             code: kmaCode(r.sky, r.pty), day: sunAltitude(p.lat, p.lon, t) > -0.833
           };
           row.feels = feelsLike(row.temp, row.rh, row.wind, t);
@@ -86,7 +86,7 @@
             var row = {
               temp: h.temperature_2m[i], rh: h.relative_humidity_2m[i],
               pop: h.precipitation_probability[i], pcp: h.precipitation[i],
-              code: h.weather_code[i], wind: h.wind_speed_10m[i], day: h.is_day[i] === 1
+              code: h.weather_code[i], wind: h.wind_speed_10m[i], vec: h.wind_direction_10m[i], day: h.is_day[i] === 1
             };
             row.feels = feelsLike(row.temp, row.rh, row.wind, new Date(h.time[i] + ":00+09:00"));
             rows.push(row);
@@ -130,6 +130,8 @@
     [-10, "#5b4a9b"], [-6, "#3f63b5"], [-2, "#3f8fd0"], [2, "#52b7d8"], [6, "#6cc7b6"], [10, "#8fcf8a"],
     [14, "#b6d86a"], [18, "#e2d64f"], [22, "#f2b63f"], [26, "#ef8a35"], [30, "#e0582f"], [34, "#b92d2b"], [38, "#7e1a2a"]
   ];
+  // 풍속(m/s): 기상청 표현 기준 약한 바람(4 미만) · 약간 강한(4~9) · 강한(9~14) · 매우 강한(14 이상)
+  var WIND_STOPS = [[0, "#f3f8f9"], [2, "#d3eaf0"], [4, "#a6d3df"], [7, "#68b2c7"], [9, "#3b8fae"], [14, "#1d4e63"], [18, "#2b2a5c"]];
   var POP_STOPS = [[0, "#ffffff"], [20, "#d7e9f7"], [40, "#a9d0ef"], [60, "#6aaee0"], [80, "#2f7fc1"], [100, "#1b4f8a"]];
 
   function hex(c) { return [1, 3, 5].map(function (i) { return parseInt(c.substr(i, 2), 16); }); }
@@ -155,6 +157,9 @@
       fmt: function (v) { return Math.round(v) + "°"; }, legend: [0, 10, 20, 30], opacity: 0.55 },
     feels: { name: "체감온도", unit: "°", get: function (r) { return r.feels; }, color: stepped(TEMP_STOPS, 2),
       fmt: function (v) { return Math.round(v) + "°"; }, legend: [0, 10, 20, 30], opacity: 0.55 },
+    wind: { name: "바람", unit: "m/s", get: function (r) { return r.wind; }, color: stepped(WIND_STOPS, 1),
+      fmt: function (v) { return v.toFixed(1) + "m/s"; }, short: function (v) { return v.toFixed(1); }, legend: [0, 4, 9, 14], opacity: 0.6,
+      dir: function (r) { return r.vec; } },
     pop: { name: "강수확률", unit: "%", get: function (r) { return r.pop; }, color: stepped(POP_STOPS, 10),
       fmt: function (v) { return Math.round(v) + "%"; }, legend: [0, 30, 60, 90], opacity: 0.6 }
   };

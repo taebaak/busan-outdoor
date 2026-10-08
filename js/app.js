@@ -163,11 +163,18 @@
     gus.forEach(function (g) {
       g.rows = data.times.map(function (_, h) {
         var avg = {};
-        ["temp", "feels", "pop"].forEach(function (k) {
+        ["temp", "feels", "pop", "wind"].forEach(function (k) {
           var s = 0, n = 0;
           g.dongs.forEach(function (d) { var v = d.rows[h][k]; if (v != null) { s += v; n++; } });
           avg[k] = n ? s / n : null;
         });
+        // 풍향은 각도라 그냥 평균하면 안 된다 (350°와 10°의 평균은 0°): 바람 벡터로 합친 뒤 각도로 되돌린다
+        var u = 0, v = 0;
+        g.dongs.forEach(function (d) {
+          var r = d.rows[h];
+          if (r.vec != null && r.wind != null) { u += r.wind * Math.sin(r.vec * Math.PI / 180); v += r.wind * Math.cos(r.vec * Math.PI / 180); }
+        });
+        avg.vec = (Math.atan2(u, v) * 180 / Math.PI + 360) % 360;
         return avg;
       });
     });
@@ -262,14 +269,15 @@
       if (state.labels) {
         var val = L_ ? L_.fmt(L_.get(u.rows[state.hour])) : "";
         var p = map.latLngToContainerPoint(u.label.getLatLng());
-        var w = (u.name.length + val.length) * 12 + 18, h = 22;
+        var arrow = L_ && L_.dir ? windArrow(L_.dir(u.rows[state.hour])) : "";
+        var w = (u.name.length + val.length) * 12 + 18 + (arrow ? 14 : 0), h = 22;
         var box = { x1: p.x - w / 2, x2: p.x + w / 2, y1: p.y - h / 2, y2: p.y + h / 2 };
         var inView = box.x2 > 0 && box.x1 < size.x && box.y2 > 0 && box.y1 < size.y;
         var hit = !showAll && placed.some(function (b) { return box.x1 < b.x2 + 4 && box.x2 > b.x1 - 4 && box.y1 < b.y2 + 2 && box.y2 > b.y1 - 2; });
         if (inView && (isGu || showAll || u === state.selected || !hit)) {
           show = true; placed.push(box);
           var cls = "dong-label" + (isGu ? " gu" : "") + (u === state.selected ? " sel" : "");
-          var html = '<span class="' + cls + '">' + u.name + (val ? "<b>" + val + "</b>" : "") + "</span>";
+          var html = '<span class="' + cls + '">' + u.name + (val ? "<b>" + arrow + val + "</b>" : "") + "</span>";
           if (u.html !== html) { u.label.setIcon(L.divIcon({ className: "label-icon", html: html, iconSize: null })); u.html = html; }
         }
       }
@@ -281,7 +289,7 @@
   function renderLegend() {
     var el = document.getElementById("legend");
     var L_ = state.layer ? LAYERS[state.layer] : null;
-    document.getElementById("hourly-layer").textContent = L_ ? L_.name : "날씨";
+    document.getElementById("hourly-layer").textContent = L_ ? L_.name + (L_.short ? " (" + L_.unit + ")" : "") : "날씨";
     if (!L_) { el.innerHTML = ""; return; }
     var a = L_.legend[0], b = L_.legend[L_.legend.length - 1], html = "<b>" + L_.fmt(a) + "</b>";
     for (var i = 0; i <= 9; i++) html += '<i style="background:' + L_.color(a + (b - a) * i / 9) + '"></i>';
@@ -329,7 +337,7 @@
       var cls = "hour" + (newDay ? " newday" : "") + (i === 0 ? " now" : "");
       html += '<button type="button" class="' + cls + '" data-i="' + i + '"' + (i === state.hour ? ' aria-current="true"' : "") + '>' +
         '<span class="day">' + dayText + '</span><span class="t">' + (i === 0 ? "지금" : t.hour + "시") + '</span>' +
-        icon(row.code, row.day) + '<span class="v">' + L_.fmt(L_.get(row)) + '</span><span class="p">' + row.pop + '%</span></button>';
+        icon(row.code, row.day) + '<span class="v">' + (L_.dir ? windArrow(L_.dir(row)) : "") + (L_.short || L_.fmt)(L_.get(row)) + '</span><span class="p">' + row.pop + '%</span></button>';
     });
     strip.innerHTML = html;
     var cur = strip.querySelector('[aria-current="true"]');
@@ -359,6 +367,13 @@
     var b = e.target.closest(".hour");
     if (b) setHour(+b.getAttribute("data-i"));
   });
+
+  // 풍향 화살표: 기상청 풍향(VEC)은 바람이 '불어오는' 방향이므로, 바람이 '불어가는' 쪽(+180°)을 가리키게 돌린다
+  function windArrow(vec) {
+    if (vec == null) return "";
+    return '<svg class="warr" viewBox="0 0 12 12" style="transform:rotate(' + Math.round((vec + 180) % 360) + 'deg)" aria-hidden="true">' +
+      '<path d="M6 1l3.5 5H7v5H5V6H2.5z" fill="currentColor"/></svg>';
+  }
 
   // 날씨 코드(WMO) → 간단한 그림
   function icon(code, day) {
