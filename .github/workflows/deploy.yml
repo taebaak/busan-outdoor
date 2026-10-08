@@ -1,0 +1,75 @@
+# 예보 갱신 + 사이트 배포
+# - 기상청 단기예보 발표(02, 05, 08, 11, 14, 17, 20, 23시) 30분 뒤마다 예보를 받아 data/forecast.json을 갱신한다.
+#   (한국시간과 UTC는 9시간 차이지만 발표 시각 목록이 3시간 간격이라 UTC로도 같은 숫자가 된다)
+# - 코드를 올렸을 때(push)는 예보는 그대로 두고 사이트만 다시 배포한다.
+# - 인증키는 저장소 Settings > Secrets and variables > Actions 에 저장한다.
+#     KMA_SERVICE_KEY : 공공데이터포털 기상청 단기예보 키
+#     VWORLD_KEY      : 브이월드 키 (배포할 때 config.js를 만들어 넣음)
+name: 예보 갱신 및 배포
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "30 2,5,8,11,14,17,20,23 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        if: github.event_name != 'push'
+        with:
+          python-version: "3.12"
+
+      - name: 기상청 예보 받기
+        if: github.event_name != 'push'
+        continue-on-error: true   # 기상청 응답 오류가 나도 기존 예보로 배포는 계속한다
+        env:
+          KMA_SERVICE_KEY: ${{ secrets.KMA_SERVICE_KEY }}
+        run: python scripts/fetch_kma.py
+
+      - name: 갱신된 예보 저장
+        if: github.event_name != 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/forecast.json
+          git diff --cached --quiet || (git commit -m "예보 갱신 $(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M')" && git push)
+
+      - name: config.js 만들기
+        env:
+          VWORLD_KEY: ${{ secrets.VWORLD_KEY }}
+        run: |
+          printf 'window.APP_CONFIG = { VWORLD_KEY: "%s" };\n' "$VWORLD_KEY" > config.js
+
+      - name: 배포용 파일 모으기
+        run: |
+          mkdir _site
+          cp -r index.html config.js css js data _site/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

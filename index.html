@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>부산 야외활동 날씨지도</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="css/style.css?v=2">
+</head>
+<body>
+<div id="map"></div>
+
+<!-- 왼쪽 위: 레이어 선택 -->
+<aside class="panel layers" id="layers">
+  <button class="layers-toggle" id="layers-toggle" type="button" aria-expanded="true">레이어</button>
+  <div class="layers-body" id="layers-body">
+    <h2>날씨 <small>하나만 선택</small></h2>
+    <div id="weather-radios"></div>
+    <h2>표시</h2>
+    <label class="opt"><input type="checkbox" id="show-labels" checked> 지역 이름과 값</label>
+    <p class="hint">축소하면 구 평균, 확대하면 행정동별 값을 보여줍니다.</p>
+    <p class="source" id="source">예보를 불러오는 중</p>
+  </div>
+</aside>
+
+<!-- 위 가운데: 지금 지도가 보여주는 것 -->
+<div class="panel map-title" id="map-title" aria-live="polite"></div>
+
+<!-- 오른쪽 위: 배경지도 -->
+<div class="panel basemap-switch" id="basemap-switch"></div>
+
+<!-- 아래: 시간 막대 + 선택한 동의 시간별 예보 -->
+<section class="bottom">
+  <div class="timebar panel">
+    <div class="track">
+      <input type="range" id="time" min="0" max="47" value="0" aria-label="예보 시각">
+      <div class="days" id="days"></div>
+    </div>
+    <output class="now" id="time-label">불러오는 중</output>
+  </div>
+  <div class="hourly panel" id="hourly">
+    <div class="hourly-head">
+      <span class="chip" id="hourly-layer">기온</span>
+      <strong id="hourly-name">지도에서 동을 누르세요</strong>
+      <span class="legend" id="legend"></span>
+    </div>
+    <div class="hourly-strip" id="hourly-strip"></div>
+  </div>
+</section>
+
+<div class="status panel" id="status" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="config.js?v=2"></script>
+<script src="js/weather.js?v=2"></script>
+<script src="js/app.js?v=2"></script>
+</body>
+</html>

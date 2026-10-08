@@ -1,0 +1,6 @@
+config.js
+.env
+__pycache__/
+.DS_Store
+data/forecast.json.bak
+forecast.bak
