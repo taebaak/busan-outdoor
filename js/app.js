@@ -193,7 +193,12 @@
     var src = "예보: " + data.meta.source;
     if (data.meta.base) { var bt = kst(data.meta.base); src += " (" + bt.month + "." + bt.date + " " + bt.hour + "시 발표)"; }
     if (data.meta.uvIssued) src += " · 자외선: 기상청 생활기상지수";
-    if (data.meta.airTime) { var at = kst(data.meta.airTime); src += " · 미세먼지: 에어코리아 (" + at.hour + "시 측정)"; }
+    if (data.meta.airTime) {
+      var at = kst(data.meta.airTime);
+      // 3시간보다 오래된 측정값이면 날짜까지 보여줘서 오래된 자료임을 알 수 있게 한다
+      var old = Date.now() - data.meta.airTime.getTime() > 3 * 3600e3;
+      src += " · 미세먼지: 에어코리아 (" + (old ? at.month + "." + at.date + " " : "") + at.hour + "시 측정" + (old ? ", 오래된 자료" : "") + ")";
+    }
     document.getElementById("source").textContent = src + " · 체감온도는 기상청 산출식으로 계산";
     setupTimebar();
     render();

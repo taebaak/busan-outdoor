@@ -260,7 +260,7 @@
       fmt: function (v) { return v == null ? "-" : Math.round(v) + " " + stage(v)[1]; },
       short: function (v) { return v == null ? "-" : String(Math.round(v)); },
       items: steps.map(function (s) { return [s[1], s[2]]; }),
-      note: function () { return "부산 전체 같은 예보 (기상청 생활기상지수)"; }
+      note: function (r) { return r && r.uv == null ? "최근 자외선 자료 없음 (예보 갱신을 기다리는 중)" : "부산 전체 같은 예보 (기상청 생활기상지수)"; }
     };
   }
 
@@ -275,7 +275,7 @@
       text: function (r) { return r[kind] == null ? "-" : r.pmMode === "예보" ? r[g] : Math.round(r[kind]) + " " + r[g]; },
       short: function (v, r) { return r && r.pmMode === "예보" ? r[g] : v == null ? "-" : String(Math.round(v)); },
       items: GRADES.map(function (gr) { return [gr, PM_COLORS[gr]]; }),
-      note: function (r) { return !r || !r.pmMode ? "자료 없음" : r.pmMode === "측정" ? "측정소 값으로 추정 (에어코리아)" : "하루 단위 예보 등급 (에어코리아)"; }
+      note: function (r) { return !r || !r.pmMode ? "최근 미세먼지 자료 없음 (측정값 갱신을 기다리는 중)" : r.pmMode === "측정" ? "측정소 값으로 추정 (에어코리아)" : "하루 단위 예보 등급 (에어코리아)"; }
     };
   }
 
