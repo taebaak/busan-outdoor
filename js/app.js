@@ -251,7 +251,6 @@
     if (keepTime) {
       data.times.forEach(function (t, i) { if (t.getTime() === keepTime) state.hour = i; });
     }
-    timeInput.value = state.hour;
     var src = "예보: " + data.meta.source;
     if (data.meta.base) { var bt = kst(data.meta.base); src += " (" + bt.month + "." + bt.date + " " + bt.hour + "시 발표)"; }
     if (data.meta.uvIssued) src += " · 자외선: 기상청 생활기상지수";
@@ -262,7 +261,6 @@
       src += " · 미세먼지: 에어코리아 (" + (old ? at.month + "." + at.date + " " : "") + at.hour + "시 측정" + (old ? ", 오래된 자료" : "") + ")";
     }
     document.getElementById("source").textContent = src + " · 체감온도는 기상청 산출식으로 계산";
-    setupTimebar();
     render();
   }
 
@@ -337,7 +335,6 @@
     renderStations();
     renderLegend();
     renderHourly();
-    updateTimeLabel();
     updateTitle();
   }
 
@@ -501,23 +498,16 @@
     return '<svg viewBox="0 0 24 24" aria-hidden="true">' + body + '</svg>';
   }
 
-  // ---------- 시간 막대 ----------
-  var timeInput = document.getElementById("time");
-  function setupTimebar() {
-    var n = state.data.times.length;
-    timeInput.max = n - 1;
-    var html = "";
-    state.data.times.forEach(function (tm, i) {
-      var t = kst(tm);
-      if (t.hour === 0) html += '<span style="left:' + (i / (n - 1) * 100) + '%">' + t.month + "." + t.date + " (" + t.day + ")</span>";
-    });
-    document.getElementById("days").innerHTML = html;
-  }
-  timeInput.addEventListener("input", function () { setHour(+timeInput.value, true); });
-  function setHour(i, fromSlider) {
-    state.hour = i;
-    if (!fromSlider) timeInput.value = i;
+  // ---------- 시각 바꾸기 ----------
+  // 하단 시간별 표에서 시각을 누르거나, 키보드 ← → 로 한 시간씩 옮긴다
+  function setHour(i) {
+    if (!state.data) return;
+    state.hour = Math.max(0, Math.min(state.data.times.length - 1, i));
     render();
   }
-  function updateTimeLabel() { document.getElementById("time-label").textContent = fmtTime(state.hour); }
+  document.addEventListener("keydown", function (e) {
+    if (e.target.closest && e.target.closest("input, textarea, select")) return;
+    if (e.key === "ArrowRight") { setHour(state.hour + 1); e.preventDefault(); }
+    if (e.key === "ArrowLeft") { setHour(state.hour - 1); e.preventDefault(); }
+  });
 })();

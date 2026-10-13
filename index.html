@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>부산 야외활동 날씨지도</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="css/style.css?v=9">
+<link rel="stylesheet" href="css/style.css?v=10">
 </head>
 <body>
 <div id="map"></div>
@@ -31,19 +31,13 @@
 <!-- 오른쪽 위: 배경지도 -->
 <div class="panel basemap-switch" id="basemap-switch"></div>
 
-<!-- 아래: 시간 막대 + 선택한 동의 시간별 예보 -->
+<!-- 아래: 선택한 동의 시간별 예보 (시각을 누르면 지도가 그 시각으로 바뀜) -->
 <section class="bottom">
-  <div class="timebar panel">
-    <div class="track">
-      <input type="range" id="time" min="0" max="47" value="0" aria-label="예보 시각">
-      <div class="days" id="days"></div>
-    </div>
-    <output class="now" id="time-label">불러오는 중</output>
-  </div>
   <div class="hourly panel" id="hourly">
     <div class="hourly-head">
       <span class="chip" id="hourly-layer">기온</span>
       <strong id="hourly-name">지도에서 동을 누르세요</strong>
+      <span class="hourly-hint">시각을 누르면 지도가 그 시각으로 바뀌어요</span>
       <span class="legend" id="legend"></span>
     </div>
     <div class="hourly-strip" id="hourly-strip"></div>
@@ -53,8 +47,8 @@
 <div class="status panel" id="status" hidden></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="config.js?v=9"></script>
-<script src="js/weather.js?v=9"></script>
-<script src="js/app.js?v=9"></script>
+<script src="config.js?v=10"></script>
+<script src="js/weather.js?v=10"></script>
+<script src="js/app.js?v=10"></script>
 </body>
 </html>
