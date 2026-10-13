@@ -22,6 +22,22 @@
   map.createPane("hoverLine").style.zIndex = 460; // 마우스를 올린 지역 테두리 (가장 위)
   ["guLines", "selLine", "hoverLine"].forEach(function (p) { map.getPane(p).style.pointerEvents = "none"; });
   map.createPane("stations").style.zIndex = 470; // 미세먼지 측정소 점 (마우스를 올리면 정보 표시)
+  map.createPane("hillshade").style.zIndex = 420; // 지형 음영: 날씨 색(400) 위에 반투명으로 겹쳐 색 위에서도 산이 보이게, 구 경계선(450) 아래
+  map.getPane("hillshade").style.pointerEvents = "none";
+
+  // ---------- 지형 음영 (음영기복도) ----------
+  // 수치지형도 등고선 → TIN 보간 DEM(20m) → 음영기복. scripts/build_terrain.ps1, build_hillshade_png.py로 만든다.
+  var hillshade = null;
+  var hillshadeBox = document.getElementById("show-hillshade");
+  fetch("data/hillshade.json").then(function (r) { return r.ok ? r.json() : null; }).then(function (b) {
+    if (!b) { hillshadeBox.closest("label").hidden = true; return; }
+    hillshade = L.imageOverlay("data/hillshade.png", [[b.south, b.west], [b.north, b.east]], { pane: "hillshade", interactive: false, opacity: 0.8 });
+    if (hillshadeBox.checked) hillshade.addTo(map);
+  }).catch(function () { hillshadeBox.closest("label").hidden = true; });
+  hillshadeBox.addEventListener("change", function () {
+    if (!hillshade) return;
+    if (hillshadeBox.checked) hillshade.addTo(map); else map.removeLayer(hillshade);
+  });
 
   var VWORLD_ATTR = '&copy; <a href="https://www.vworld.kr" target="_blank" rel="noopener">VWorld</a>';
   function vworld(layer, ext) {
