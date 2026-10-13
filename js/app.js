@@ -127,13 +127,21 @@
     radios.appendChild(lab);
   });
   document.getElementById("show-labels").addEventListener("change", function (e) { state.labels = e.target.checked; placeLabels(); });
+  // 레이어 패널 접기/펼치기. 접은 상태는 이 브라우저에 기억한다 (휴대폰은 처음부터 접힌 상태)
   var layersEl = document.getElementById("layers");
-  document.getElementById("layers-toggle").addEventListener("click", function (e) {
-    var open = layersEl.getAttribute("data-open") === "false";
+  var layersToggle = document.getElementById("layers-toggle");
+  function setLayersOpen(open) {
     layersEl.setAttribute("data-open", open ? "true" : "false");
-    e.currentTarget.setAttribute("aria-expanded", open ? "true" : "false");
+    layersToggle.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+  layersToggle.addEventListener("click", function () {
+    var open = layersEl.getAttribute("data-open") === "false";
+    setLayersOpen(open);
+    try { localStorage.setItem("layersOpen", open ? "1" : "0"); } catch (err) { /* 저장이 막힌 브라우저는 무시 */ }
   });
-  if (window.innerWidth <= 640) layersEl.setAttribute("data-open", "false");
+  var savedOpen = null;
+  try { savedOpen = localStorage.getItem("layersOpen"); } catch (err) { /* 무시 */ }
+  setLayersOpen(savedOpen ? savedOpen === "1" : window.innerWidth > 640);
 
   // ---------- 경계 불러오기 ----------
   var dongs = [], gus = [];
