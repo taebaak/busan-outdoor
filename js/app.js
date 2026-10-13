@@ -44,10 +44,18 @@
     return L.tileLayer("https://api.vworld.kr/req/wmts/1.0.0/" + KEY + "/" + layer + "/{z}/{y}/{x}." + ext,
       { maxZoom: 19, attribution: VWORLD_ATTR });
   }
+  // 첫 번째가 기본 배경. 브이월드 지도는 지명이 이미지에 새겨져 있어 글자만 끌 수 없으므로,
+  // 날씨 색과 라벨이 잘 읽히도록 글자 없는 배경(Esri 연회색, 지명 레이어를 뺀 Base)을 기본으로 둔다.
+  var noLabels = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}", {
+    maxZoom: 19, maxNativeZoom: 13, // 부산 지역은 13단계까지만 그림이 있어 그 이상은 확대해서 쓴다
+    attribution: 'Tiles &copy; <a href="https://www.esri.com" target="_blank" rel="noopener">Esri</a>'
+  });
   var basemaps = KEY ? {
+    "글자 없음": noLabels,
     "흰색": vworld("white", "png"), "기본": vworld("Base", "png"),
     "위성": vworld("Satellite", "jpeg"), "야간": vworld("midnight", "png")
   } : {
+    "글자 없음": noLabels,
     "OpenStreetMap": L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
       { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" })
   };
