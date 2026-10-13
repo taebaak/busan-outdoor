@@ -25,6 +25,39 @@
   map.createPane("hillshade").style.zIndex = 420; // 지형 음영: 날씨 색(400) 위에 반투명으로 겹쳐 색 위에서도 산이 보이게, 구 경계선(450) 아래
   map.getPane("hillshade").style.pointerEvents = "none";
 
+  // ---------- 지하철 노선 ----------
+  // OpenStreetMap에서 받은 도시철도 노선(scripts/fetch_subway.py). 글자 없이 노선 색과 역 점만 그린다.
+  map.createPane("subway").style.zIndex = 440;   // 지형 음영(420) 위, 구 경계선(450) 아래
+  map.getPane("subway").style.pointerEvents = "none";
+  var subway = null;
+  var subwayBox = document.getElementById("show-subway");
+  fetch("data/subway.geojson").then(function (r) { return r.ok ? r.json() : null; }).then(function (geo) {
+    if (!geo) { subwayBox.closest("label").hidden = true; return; }
+    var lines = geo.features.filter(function (f) { return f.properties.kind === "line"; });
+    var stns = geo.features.filter(function (f) { return f.properties.kind === "station"; });
+    var opts = { pane: "subway", interactive: false };
+    var casing = L.geoJSON({ type: "FeatureCollection", features: lines }, Object.assign({ style: { color: "#ffffff", weight: 5.5, opacity: 0.9 } }, opts));
+    var colored = L.geoJSON({ type: "FeatureCollection", features: lines }, Object.assign({ style: function (f) { return { color: f.properties.colour, weight: 3, opacity: 1 }; } }, opts));
+    var dots = L.geoJSON({ type: "FeatureCollection", features: stns }, Object.assign({
+      pointToLayer: function (f, ll) { return L.circleMarker(ll, { pane: "subway", interactive: false, radius: 3, weight: 2, color: f.properties.colour, fillColor: "#ffffff", fillOpacity: 1 }); }
+    }, opts));
+    subway = L.layerGroup([casing, colored]);
+    map.attributionControl.addAttribution('지하철 노선 &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>');
+    // 역 점은 확대했을 때만 (축소하면 점이 노선을 덮어 지저분해짐)
+    function syncDots() {
+      var on = subwayBox.checked && map.getZoom() >= 12;
+      if (on && !map.hasLayer(dots)) dots.addTo(map);
+      if (!on && map.hasLayer(dots)) map.removeLayer(dots);
+    }
+    map.on("zoomend", syncDots);
+    subwayBox.addEventListener("change", function () {
+      if (subwayBox.checked) subway.addTo(map); else map.removeLayer(subway);
+      syncDots();
+    });
+    if (subwayBox.checked) subway.addTo(map);
+    syncDots();
+  }).catch(function () { subwayBox.closest("label").hidden = true; });
+
   // ---------- 지형 음영 (음영기복도) ----------
   // 수치지형도 등고선 → TIN 보간 DEM(20m) → 음영기복. scripts/build_terrain.ps1, build_hillshade_png.py로 만든다.
   var hillshade = null;
@@ -48,6 +81,7 @@
   // 날씨 색과 라벨이 잘 읽히도록 글자 없는 배경(Esri 연회색, 지명 레이어를 뺀 Base)을 기본으로 둔다.
   var noLabels = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}", {
     maxZoom: 19, maxNativeZoom: 13, // 부산 지역은 13단계까지만 그림이 있어 그 이상은 확대해서 쓴다
+    className: "base-nolabel",      // 원래 너무 연해서 CSS로 대비를 높인다 (style.css)
     attribution: 'Tiles &copy; <a href="https://www.esri.com" target="_blank" rel="noopener">Esri</a>'
   });
   var basemaps = KEY ? {
@@ -121,7 +155,7 @@
       return poly[0].map(function (c) { return [c[1], c[0]]; });
     });
     L.polygon([[[-89, -179], [89, -179], [89, 179], [-89, 179]]].concat(holes), {
-      pane: "mask", interactive: false, stroke: false, fillColor: "#f4f6f7", fillOpacity: 0.78
+      pane: "mask", interactive: false, stroke: false, fillColor: "#cdd3d6", fillOpacity: 0.9
     }).addTo(map);
     var outline = L.geoJSON(busanGeo, { pane: "guLines", interactive: false, style: { color: "#1b2328", weight: 2, fill: false } }).addTo(map);
 

@@ -237,14 +237,14 @@
 
   var LAYERS = {
     temp: { name: "기온", unit: "°", get: function (r) { return r.temp; }, color: stepped(TEMP_STOPS, 2),
-      fmt: function (v) { return Math.round(v) + "°"; }, legend: [0, 10, 20, 30], opacity: 0.55 },
+      fmt: function (v) { return Math.round(v) + "°"; }, legend: [0, 10, 20, 30], opacity: 0.68 },
     feels: { name: "체감온도", unit: "°", get: function (r) { return r.feels; }, color: stepped(TEMP_STOPS, 2),
-      fmt: function (v) { return Math.round(v) + "°"; }, legend: [0, 10, 20, 30], opacity: 0.55 },
+      fmt: function (v) { return Math.round(v) + "°"; }, legend: [0, 10, 20, 30], opacity: 0.68 },
     wind: { name: "바람", unit: "m/s", get: function (r) { return r.wind; }, color: stepped(WIND_STOPS, 1),
-      fmt: function (v) { return v.toFixed(1) + "m/s"; }, short: function (v) { return v.toFixed(1); }, legend: [0, 4, 9, 14], opacity: 0.6,
+      fmt: function (v) { return v.toFixed(1) + "m/s"; }, short: function (v) { return v.toFixed(1); }, legend: [0, 4, 9, 14], opacity: 0.72,
       dir: function (r) { return r.vec; } },
     pop: { name: "강수확률", unit: "%", get: function (r) { return r.pop; }, color: stepped(POP_STOPS, 10),
-      fmt: function (v) { return Math.round(v) + "%"; }, legend: [0, 30, 60, 90], opacity: 0.6 },
+      fmt: function (v) { return Math.round(v) + "%"; }, legend: [0, 30, 60, 90], opacity: 0.72 },
     uv: uvLayer(),
     pm10: pmLayer("pm10", "미세먼지"),
     pm25: pmLayer("pm25", "초미세먼지")
@@ -255,7 +255,7 @@
     var steps = [[2, "낮음", "#7bc47f"], [5, "보통", "#f2d24b"], [7, "높음", "#f29b3c"], [10, "매우높음", "#e0533a"], [99, "위험", "#8e44ad"]];
     function stage(v) { var r = Math.round(v); for (var i = 0; i < steps.length; i++) if (r <= steps[i][0]) return steps[i]; }
     return {
-      name: "자외선", unit: "", opacity: 0.55, get: function (r) { return r.uv; },
+      name: "자외선", unit: "", opacity: 0.68, get: function (r) { return r.uv; },
       color: function (v) { return v == null ? "#cccccc" : stage(v)[2]; },
       fmt: function (v) { return v == null ? "-" : Math.round(v) + " " + stage(v)[1]; },
       short: function (v) { return v == null ? "-" : String(Math.round(v)); },
@@ -267,7 +267,7 @@
   function pmLayer(kind, name) {
     var g = kind + "g";
     return {
-      name: name, unit: "㎍/㎥", opacity: 0.55, kind: kind,
+      name: name, unit: "㎍/㎥", opacity: 0.68, kind: kind,
       get: function (r) { return r[kind]; },
       color: function (v, r) { var gr = r ? r[g] : gradeOf(kind, v); return gr ? PM_COLORS[gr] : "#cccccc"; },
       fmt: function (v) { return v == null ? "-" : Math.round(v) + " " + gradeOf(kind, v); },
