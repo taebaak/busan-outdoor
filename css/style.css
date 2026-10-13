@@ -17,7 +17,7 @@ button { font: inherit; color: inherit; }
 .panel { background: var(--panel); border-radius: 10px; box-shadow: var(--shadow); }
 
 /* 레이어 패널 */
-.layers { position: absolute; top: 12px; left: 56px; z-index: 1000; width: 210px; overflow: hidden; }
+.layers { position: absolute; top: 12px; left: 12px; z-index: 1000; width: 210px; overflow: hidden; }
 .layers[data-open="false"] { width: auto; }
 .layers-toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; border: 0; background: none; padding: 9px 14px; text-align: left; font-weight: 600; font-size: 13px; cursor: pointer; }
 .layers-toggle::after { content: ""; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-135deg) translate(-2px, -2px); transition: transform .15s; }
@@ -90,17 +90,19 @@ button { font: inherit; color: inherit; }
 
 .status { position: absolute; top: 60px; right: 12px; z-index: 1000; padding: 8px 12px; font-size: 12px; max-width: 280px; }
 
+/* 확대·축소 버튼: 오른쪽 아래, 시간별 표 바로 위 (--bottom-h는 app.js가 표 높이로 채움) */
+.leaflet-bottom.leaflet-right .leaflet-control-zoom { margin-bottom: calc(var(--bottom-h, 160px) + 14px); margin-right: 12px; }
+
 @media (max-width: 640px) {
-  /* 휴대폰: 확대 버튼은 숨기고(손가락으로 확대), 레이어 버튼은 왼쪽 위, 지도 제목은 오른쪽 위 */
-  .layers { left: 10px; top: 10px; width: auto; max-width: calc(100% - 20px); }
+  /* 휴대폰: 맨 위 한 줄은 지도 정보, 그 아래 줄에 레이어(왼쪽)와 배경지도(오른쪽) */
+  .map-title { top: 10px; left: 10px; right: 10px; transform: none; white-space: normal; font-size: 12px; padding: 6px 10px; line-height: 1.35; }
+  .map-title span { margin-left: 6px; font-size: 11px; }
+  .layers { left: 10px; top: 58px; width: auto; max-width: calc(100% - 20px); }
   .layers[data-open="true"] { width: 230px; }
-  .layers-body { max-height: calc(100vh - 290px); overflow-y: auto; }
-  .map-title { top: 10px; left: auto; right: 10px; transform: none; white-space: normal; max-width: calc(100% - 120px); font-size: 12px; padding: 6px 10px; line-height: 1.35; }
-  .map-title span { display: block; margin-left: 0; font-size: 11px; }
+  .layers-body { max-height: calc(100vh - 340px); overflow-y: auto; }
+  .basemap-switch { top: 58px; right: 10px; padding: 3px; }
+  .basemap-switch button { font-size: 12px; padding: 5px 7px; }
 }
-/* 레이어 패널 안으로 옮긴 배경지도 버튼 (휴대폰) */
-.basemap-switch.in-panel { position: static; box-shadow: none; padding: 0; flex-wrap: wrap; gap: 4px; }
-.basemap-switch.in-panel button { border: 1px solid var(--line); }
 
 /* 풍향 화살표 (바람 레이어) */
 .warr { width: 11px; height: 11px; display: inline-block; vertical-align: -1px; margin-right: 2px; }
@@ -123,7 +125,7 @@ button { font: inherit; color: inherit; }
   .dong-label.gu { font-size: 12px; padding: 2px 7px; }
 }
 
-/* 휴대폰: 레이어 패널을 펼치면 지도 제목과 겹치므로 잠시 숨긴다 */
+/* 휴대폰: 레이어 패널을 펼치면 배경지도 버튼과 겹치므로 잠시 숨긴다 */
 @media (max-width: 640px) {
-  .layers[data-open="true"] ~ .map-title { display: none; }
+  .layers[data-open="true"] ~ .basemap-switch { display: none; }
 }

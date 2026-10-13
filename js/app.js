@@ -17,7 +17,14 @@
   // ---------- 지도와 배경지도 ----------
   var MOBILE = window.innerWidth <= 640;
   // zoomSnap 0.25: 화면 폭에 맞춰 부산 전체가 딱 들어오도록 4분의 1 단계 배율도 허용 (휴대폰에서 잘림 방지)
-  var map = L.map("map", { minZoom: 8, maxZoom: 19, zoomSnap: 0.25, maxBoundsViscosity: 1.0, zoomControl: !MOBILE }).setView([35.12, 129.06], 11);
+  var map = L.map("map", { minZoom: 8, maxZoom: 19, zoomSnap: 0.25, maxBoundsViscosity: 1.0, zoomControl: false }).setView([35.12, 129.06], 11);
+  L.control.zoom({ position: "bottomright", zoomInTitle: "확대", zoomOutTitle: "축소" }).addTo(map);
+  // 오른쪽 아래 확대·축소 버튼이 시간별 표에 가리지 않도록 표 높이를 CSS 변수로 넘긴다
+  function syncBottomHeight() {
+    var h = document.querySelector(".bottom").offsetHeight;
+    document.documentElement.style.setProperty("--bottom-h", h + "px");
+  }
+  window.addEventListener("resize", syncBottomHeight);
   map.createPane("mask").style.zIndex = 350;      // 배경지도(200) 위, 색 면(400) 아래
   map.createPane("guLines").style.zIndex = 450;   // 행정동 색 면 위에 구 경계선
   map.createPane("selLine").style.zIndex = 455;   // 선택한 행정동 테두리
@@ -101,14 +108,6 @@
   };
   var currentBase = null;
   var baseEl = document.getElementById("basemap-switch");
-  // 휴대폰: 배경지도 버튼이 지도를 가리지 않도록 레이어 패널 안으로 옮긴다
-  if (MOBILE) {
-    var h = document.createElement("h2"); h.textContent = "배경지도";
-    var body = document.getElementById("layers-body");
-    body.insertBefore(h, body.querySelector(".source"));
-    body.insertBefore(baseEl, body.querySelector(".source"));
-    baseEl.classList.add("in-panel");
-  }
   Object.keys(basemaps).forEach(function (name, i) {
     var b = document.createElement("button");
     b.type = "button"; b.textContent = name;
@@ -190,7 +189,8 @@
       [b.getNorth() + latSpan * 0.1, b.getEast() + lonSpan * 0.08]));
     // 처음 화면: 아래 패널을 뺀 영역에 부산 전체가 들어오게
     var bottomH = document.querySelector(".bottom").offsetHeight;
-    map.fitBounds(b, { paddingTopLeft: [MOBILE ? 2 : 20, MOBILE ? 56 : 56], paddingBottomRight: [MOBILE ? 2 : 20, bottomH + 8] });
+    syncBottomHeight();
+    map.fitBounds(b, { paddingTopLeft: [MOBILE ? 2 : 20, MOBILE ? 104 : 56], paddingBottomRight: [MOBILE ? 2 : 20, bottomH + 8] });
     map.setMinZoom(map.getZoom());
 
     // 행정동 (확대했을 때)
@@ -444,6 +444,7 @@
         icon(row.code, row.day) + '<span class="v">' + (L_.dir ? windArrow(L_.dir(row)) : "") + shortText(L_, row) + '</span><span class="p">' + row.pop + '%</span></button>';
     });
     strip.innerHTML = html;
+    syncBottomHeight();
     var cur = strip.querySelector('[aria-current="true"]');
     if (cur && state.hour > 0) strip.scrollLeft = Math.max(0, cur.offsetLeft - strip.clientWidth / 2 + cur.offsetWidth / 2);
   }
