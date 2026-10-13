@@ -3,7 +3,7 @@
 
   var KEY = (window.APP_CONFIG && window.APP_CONFIG.VWORLD_KEY || "").trim();
   var LAYERS = Weather.LAYERS;
-  var GU_MAX_ZOOM = 11;   // 이 배율 이하에서는 구 단위로 보여준다
+  var GU_MAX_ZOOM = 11.5; // 이 배율 미만에서는 구 단위로 보여준다 (첫 화면 = 부산 전체 = 구 단위)
   var ALL_LABEL_ZOOM = 13; // 이 배율 이상에서는 행정동 라벨을 모두 보여준다
 
   var state = {
@@ -15,7 +15,9 @@
   };
 
   // ---------- 지도와 배경지도 ----------
-  var map = L.map("map", { minZoom: 10, maxZoom: 19, maxBoundsViscosity: 1.0 }).setView([35.12, 129.06], 11);
+  var MOBILE = window.innerWidth <= 640;
+  // zoomSnap 0.25: 화면 폭에 맞춰 부산 전체가 딱 들어오도록 4분의 1 단계 배율도 허용 (휴대폰에서 잘림 방지)
+  var map = L.map("map", { minZoom: 8, maxZoom: 19, zoomSnap: 0.25, maxBoundsViscosity: 1.0, zoomControl: !MOBILE }).setView([35.12, 129.06], 11);
   map.createPane("mask").style.zIndex = 350;      // 배경지도(200) 위, 색 면(400) 아래
   map.createPane("guLines").style.zIndex = 450;   // 행정동 색 면 위에 구 경계선
   map.createPane("selLine").style.zIndex = 455;   // 선택한 행정동 테두리
@@ -99,6 +101,14 @@
   };
   var currentBase = null;
   var baseEl = document.getElementById("basemap-switch");
+  // 휴대폰: 배경지도 버튼이 지도를 가리지 않도록 레이어 패널 안으로 옮긴다
+  if (MOBILE) {
+    var h = document.createElement("h2"); h.textContent = "배경지도";
+    var body = document.getElementById("layers-body");
+    body.insertBefore(h, body.querySelector(".source"));
+    body.insertBefore(baseEl, body.querySelector(".source"));
+    baseEl.classList.add("in-panel");
+  }
   Object.keys(basemaps).forEach(function (name, i) {
     var b = document.createElement("button");
     b.type = "button"; b.textContent = name;
@@ -180,7 +190,7 @@
       [b.getNorth() + latSpan * 0.1, b.getEast() + lonSpan * 0.08]));
     // 처음 화면: 아래 패널을 뺀 영역에 부산 전체가 들어오게
     var bottomH = document.querySelector(".bottom").offsetHeight;
-    map.fitBounds(b, { paddingTopLeft: [20, 56], paddingBottomRight: [20, bottomH + 16] });
+    map.fitBounds(b, { paddingTopLeft: [MOBILE ? 2 : 20, MOBILE ? 56 : 56], paddingBottomRight: [MOBILE ? 2 : 20, bottomH + 8] });
     map.setMinZoom(map.getZoom());
 
     // 행정동 (확대했을 때)
@@ -304,7 +314,7 @@
   }
 
   // ---------- 구 단위 / 행정동 단위 전환 ----------
-  function mode() { return map.getZoom() <= GU_MAX_ZOOM ? "gu" : "dong"; }
+  function mode() { return map.getZoom() < GU_MAX_ZOOM ? "gu" : "dong"; }
   var currentMode = null;
   function applyMode() {
     var m = mode();
@@ -327,7 +337,7 @@
   // 확대할수록 날씨 색을 옅게 해서 아래의 길·건물(배경지도)이 보이게 한다
   function fillFade() {
     var z = map.getZoom();
-    return z <= 12 ? 1 : z === 13 ? 0.75 : z === 14 ? 0.55 : 0.4;
+    return z < 12.5 ? 1 : z < 13.5 ? 0.75 : z < 14.5 ? 0.55 : 0.4;
   }
   map.on("zoomend", function () { render(); });
   function units() { return currentMode === "gu" ? gus : dongs; }
@@ -363,7 +373,7 @@
         var box = { x1: p.x - w / 2, x2: p.x + w / 2, y1: p.y - h / 2, y2: p.y + h / 2 };
         var inView = box.x2 > 0 && box.x1 < size.x && box.y2 > 0 && box.y1 < size.y;
         var hit = !showAll && placed.some(function (b) { return box.x1 < b.x2 + 4 && box.x2 > b.x1 - 4 && box.y1 < b.y2 + 2 && box.y2 > b.y1 - 2; });
-        if (inView && (isGu || showAll || u === state.selected || !hit)) {
+        if (inView && ((isGu && !MOBILE) || showAll || u === state.selected || !hit)) {
           show = true; placed.push(box);
           var cls = "dong-label" + (isGu ? " gu" : "") + (u === state.selected ? " sel" : "");
           var html = '<span class="' + cls + '">' + u.name + (val ? "<b>" + arrow + val + "</b>" : "") + "</span>";
