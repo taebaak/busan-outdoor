@@ -77,21 +77,25 @@
     return L.tileLayer("https://api.vworld.kr/req/wmts/1.0.0/" + KEY + "/" + layer + "/{z}/{y}/{x}." + ext,
       { maxZoom: 19, attribution: VWORLD_ATTR });
   }
-  // 첫 번째가 기본 배경. 브이월드 지도는 지명이 이미지에 새겨져 있어 글자만 끌 수 없으므로,
-  // 날씨 색과 라벨이 잘 읽히도록 글자 없는 배경(Esri 연회색, 지명 레이어를 뺀 Base)을 기본으로 둔다.
-  var noLabels = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}", {
+  // 첫 번째가 기본 배경. 글자 없이도 길·건물·산·바다가 그대로 보이는 위성 지도를 기본으로 둔다.
+  // (브이월드 흰색·기본 지도는 지명이 이미지에 새겨져 있어 글자만 끌 수 없다)
+  var grayBase = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}", {
     maxZoom: 19, maxNativeZoom: 13, // 부산 지역은 13단계까지만 그림이 있어 그 이상은 확대해서 쓴다
     className: "base-nolabel",      // 원래 너무 연해서 CSS로 대비를 높인다 (style.css)
     attribution: 'Tiles &copy; <a href="https://www.esri.com" target="_blank" rel="noopener">Esri</a>'
   });
+  var esriImagery = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+    maxZoom: 19, attribution: 'Tiles &copy; <a href="https://www.esri.com" target="_blank" rel="noopener">Esri</a>'
+  });
   var basemaps = KEY ? {
-    "글자 없음": noLabels,
-    "흰색": vworld("white", "png"), "기본": vworld("Base", "png"),
-    "위성": vworld("Satellite", "jpeg"), "야간": vworld("midnight", "png")
+    "위성": vworld("Satellite", "jpeg"),
+    "흰색": vworld("white", "png"), "기본": vworld("Base", "png"), "야간": vworld("midnight", "png"),
+    "회색": grayBase
   } : {
-    "글자 없음": noLabels,
+    "위성": esriImagery,
     "OpenStreetMap": L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-      { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" })
+      { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" }),
+    "회색": grayBase
   };
   var currentBase = null;
   var baseEl = document.getElementById("basemap-switch");
@@ -314,6 +318,12 @@
   map.on("moveend zoomend", placeLabels);
 
   // ---------- 칠하기 ----------
+  // 확대할수록 날씨 색을 옅게 해서 아래의 길·건물(배경지도)이 보이게 한다
+  function fillFade() {
+    var z = map.getZoom();
+    return z <= 12 ? 1 : z === 13 ? 0.75 : z === 14 ? 0.55 : 0.4;
+  }
+  map.on("zoomend", function () { render(); });
   function units() { return currentMode === "gu" ? gus : dongs; }
 
   function render() {
@@ -321,7 +331,7 @@
     var L_ = state.layer ? LAYERS[state.layer] : null;
     units().forEach(function (u) {
       var row = u.rows[state.hour], v = L_ ? L_.get(row) : null;
-      u.layer.setStyle({ fillColor: L_ ? L_.color(v, row) : "#000", fillOpacity: L_ ? L_.opacity : 0 });
+      u.layer.setStyle({ fillColor: L_ ? L_.color(v, row) : "#000", fillOpacity: L_ ? L_.opacity * fillFade() : 0 });
     });
     placeLabels();
     renderStations();
